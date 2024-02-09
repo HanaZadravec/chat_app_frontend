@@ -1,12 +1,53 @@
+import { useEffect, useState, useContext } from "react"
+import Avatar from "./Avatar";
+import Logo from "./Logo";
+import { UserContext } from "./UserContext";
+
 export default function Chat() {
+    const [ws, setWs] = useState(null);
+    const [onlinePeople, setOnlinePeople] = useState({});
+    const [selectedPersonId, setSelectedPersonId] = useState(null);
+    const {username, userId} = useContext(UserContext);
+    useEffect(()=>{
+        const ws = new WebSocket('ws://localhost:5000');
+        setWs(ws);
+        ws.addEventListener('message',handleMessage)
+    }, [])
+    function showOnlinePeople(peopleArray) {
+        const people = {};
+        peopleArray.forEach(({userId, username}) => {
+            people[userId] = username;
+        });
+        setOnlinePeople(people);
+    }
+    
+    function handleMessage(ev){
+        const messageData = JSON.parse(ev.data);
+        if('online' in messageData){
+            showOnlinePeople(messageData.online);
+        }
+    }
+    const OnlinePeopleWithoutUser = {...onlinePeople};
+    delete OnlinePeopleWithoutUser[userId];
     return (
       <div className="flex h-screen">
         <div className="bg-white w-1/3">
-            contacts
+            <Logo />
+            {Object.keys(OnlinePeopleWithoutUser).map(userId => (
+            <div key={userId} onClick={() =>setSelectedPersonId(userId)} 
+                 className={"border-b border-gray-100 flex items-center gap-2 cursor-pointer " + (userId === selectedPersonId ? 'bg-blue-50' : '')}>
+                    {userId === selectedPersonId && <div className="w-1 bg-blue-500 h-12 rounded-r-md"></div>}
+                <div className="flex gap-2 py-2 pl-4 items-center">
+                    <Avatar username={onlinePeople[userId]} userId={userId}/>
+                    <span className="text-gray-800">{onlinePeople[userId]}</span>
+                </div>
+            </div>
+         ))}
         </div>
         <div className=" flex flex-col bg-blue-50 w-2/3 p-2">
             <div className="flex-grow">
-                messages with selected person
+               {!selectedPersonId && <div className="text-center text-gray-500 mt-20">
+                   Select a person to chat with </div>}
                 </div>
             <div className="flex gap-2 ">
                 <input type="text" 
