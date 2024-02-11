@@ -1,8 +1,9 @@
-import { useEffect, useState, useContext } from "react"
+import { useEffect, useState, useContext,useRef } from "react"
 import Avatar from "./Avatar";
 import Logo from "./Logo";
 import { UserContext } from "./UserContext";
 import { uniqBy } from "lodash";
+import axios from "axios";
 
 export default function Chat() {
     const [ws, setWs] = useState(null);
@@ -11,11 +12,23 @@ export default function Chat() {
     const [newMessageText, setNewMessageText] = useState('');
     const [messages, setMessages] = useState([]);
     const {username, userId} = useContext(UserContext);
+    const divUnderMessages = useRef();
     useEffect(()=>{
+        connectToWs();
+    }, [])
+
+    function connectToWs(){
         const ws = new WebSocket('ws://localhost:5000');
         setWs(ws);
         ws.addEventListener('message',handleMessage)
-    }, [])
+        ws.addEventListener('close', () => {
+            setTimeout(() => {
+                console.log('Disconnected from ws, reconnecting');
+                connectToWs();
+            }, 1000);
+        });
+    }
+
     function showOnlinePeople(peopleArray) {
         const people = {};
         peopleArray.forEach(({userId, username}) => {
@@ -43,6 +56,20 @@ export default function Chat() {
         setNewMessageText('');
         setMessages(prev => [...prev, {text: newMessageText, sender: userId,recipient: selectedPersonId, id: Date.now()}]);
     }
+
+    useEffect(()=>{
+        const div = divUnderMessages.current
+        if(div){
+            div.scrollIntoView({behavior: 'smooth', block: 'end'});
+        }
+    },[messages])
+
+    useEffect(()=>{
+        if(selectedPersonId){
+            axios.get('/messages/' + selectedPersonId).then();
+        }
+    },[selectedPersonId])
+
     const OnlinePeopleWithoutUser = {...onlinePeople};
     delete OnlinePeopleWithoutUser[userId];
     const messagesWithoutDupes = uniqBy(messages,'id');
@@ -61,13 +88,13 @@ export default function Chat() {
             </div>
          ))}
         </div>
-        <div className=" flex flex-col bg-blue-50 w-2/3 p-2">
+        <div className="flex flex-col bg-blue-50 w-2/3 p-2">
             <div className="flex-grow">
                {!selectedPersonId && <div className="text-center text-gray-500 mt-20">
                    Select a person to chat with </div>}
                 {!!selectedPersonId && (
                     <div className="relative h-full">
-                    <div className="overflow-y-scroll absolute inset-0">
+                    <div className="overflow-y-scroll absolute top-0 left-0 right-0 bottom-2">
                     {messagesWithoutDupes.map(message =>(
                     <div className={(message.sender === userId ? 'text-right' : 'text-left')}>
                     <div className={"text-left inline-block p-2 my-2 rounded-md text-sm " + (message.sender === userId ? 'bg-blue-500 text-white' : 'bg-white text-gray-500')}>
@@ -77,6 +104,7 @@ export default function Chat() {
                        </div>
                     </div>
                     ))}
+                    <div ref={divUnderMessages}></div>
                     </div>
                     </div>
                 )}
